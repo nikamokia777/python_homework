@@ -1,97 +1,68 @@
-class Book:
-    def __init__(self, title, author, year):
-        self.title = title
-        self.author = author
-        self.year = year
-        
-    def __str__(self):
-        return f"{self.title}, {self.author}, {self.year}"
+import streamlit as st
+import requests
 
-class Book_Manager:
-    def __init__(self):
-        self.books = []
 
-    def add_book(self, book):
-        for b in self.books:
-            if b.author.lower() == book.author.lower():
-                return False
-        self.books.append(book)
-        return True
+url = "https://fakestoreapi.com/products"
 
-    def show_books(self):
-        if not self.books:
-            print("No books available.")
-            return
-        for book in self.books:
-            print(book)
+try:
+    with st.spinner("Loading products..."):
+        response = requests.get(url)
+        response.raise_for_status()
+        products = response.json()
 
-    def search_book(self, title):
-        title_clean = title.strip().lower()
-        found_books = []
-        for book in self.books:
-            if title_clean == book.title.lower():
-                found_books.append(book)
-        return found_books
+except requests.exceptions.RequestException:
+    st.error("Failed to load products")
+    products = []
 
-    def delete_book(self, title):
-        title_clean = title.strip().lower()
-        for book in self.books:
-            if title_clean == book.title.lower():
-                self.books.remove(book)
-                return 'book removed successfully'
-        return 'book not found'
 
-def get_non_empty_input(prompt):
-    while True:
-        value = input(prompt).strip()
-        if value:
-            return value
-        print("Input cannot be empty! Try again.")
-            
-def main():
-    manager = Book_Manager()
-    while True:
-        print('\n==== BOOK MANAGER ====')
-        print('1. add book')
-        print('2. show book')
-        print('3. search book')
-        print('4. delete book')
-        print('5. Exit')
+st.title("Fake Store Products")
 
-        choice = input('Choose operation: ').strip()
-        if choice == '1':
-            title = get_non_empty_input('Enter book title: ')
-            author = get_non_empty_input('Enter author: ')
-            while True:
-                year = input('Enter year: ').strip()
-                if year.isdigit():
-                    year = int(year)
-                    break
-                print('Invalid year! Try again')
-            
-            book = Book(title, author, year)
-            if manager.add_book(book):
-                print('Book added successfully!')
-            else:
-                print(f'Error: Book by author "{author}" already exists!')
-                
-        elif choice == '2':
-            manager.show_books()
-        elif choice == '3':
-            title = get_non_empty_input('Enter title: ')
-            results = manager.search_book(title)
-            if results:
-                for book in results:
-                    print(book)
-            else:
-                print('book not found')
-        elif choice == '4':
-            title = get_non_empty_input('Enter title: ')
-            print(manager.delete_book(title))
-        elif choice == '5':
-            print('Goodbye!!!')
-            break
-        else:
-            print('Invalid choice!')
+categories = list(set(product["category"] for product in products))
+categories.insert(0, "All")
 
-main()
+category = st.sidebar.selectbox(
+    "Category",
+    categories
+)
+
+max_price = max(product["price"] for product in products)
+
+maximum_price = st.sidebar.slider(
+    "Maximum Price",
+    0.0,
+    float(max_price),
+    float(max_price)
+)
+
+search = st.sidebar.text_input("Search")
+filtered_products = products
+
+if category != "All":
+    filtered_products = [
+        product for product in filtered_products
+        if product["category"] == category
+    ]
+
+filtered_products = [
+    product for product in filtered_products
+    if product["price"] <= maximum_price
+]
+
+if search:
+    filtered_products = [
+        product for product in filtered_products
+        if search.lower() in product["title"].lower()
+    ]
+for product in filtered_products:
+    st.write("ID:", product["id"])
+    st.write("Title:", product["title"])
+    st.write("Price:", product["price"])
+    st.write("Category:", product["category"])
+    st.image(product["image"])
+    st.write("Rating:", product["rating"]["rate"])
+    st.write("Rating Count:", product["rating"]["count"])
+
+    with st.expander("View details"):
+        st.write(product["description"])
+
+    st.write("--------------------")
